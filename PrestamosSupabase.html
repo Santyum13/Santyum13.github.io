@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestión de Préstamos de Libros - UAEH</title>
+    <!-- Tailwind CSS (Capa de Presentación - Vista) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Supabase (Capa de Datos) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans min-h-screen flex flex-col">
+
+    <!-- Barra de Navegación -->
+    <nav class="bg-red-900 text-white shadow-md">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <!-- Logotipo de la UAEH integrado aquí -->
+                <img src="uaeh_logo_color.png" alt="Logotipo UAEH" class="h-12 bg-white px-2 py-1 rounded shadow-sm">
+                <div>
+                    <h1 class="font-bold text-lg leading-tight">Préstamos de Biblioteca</h1>
+                    <p class="text-xs text-red-200">Proyecto Análisis - Ramos Díaz Santiago / Ramirez Mecidor Jeffry / Aguirre Diaz Diego</p>
+                </div>
+            </div>
+            <div id="nav-user-info" class="hidden flex items-center space-x-4">
+                <span id="user-badge" class="text-sm bg-red-800 px-3 py-1 rounded-full"></span>
+                <button onclick="cerrarSesion()" class="bg-white text-red-900 text-sm font-semibold px-3 py-1 rounded hover:bg-gray-200 transition">
+                    Cerrar Sesión
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Banner de Notificaciones -->
+    <div id="alert-box" class="hidden max-w-6xl mx-auto w-full mt-4 px-4">
+        <div id="alert-content" class="p-4 rounded-lg shadow text-sm font-medium flex justify-between items-center">
+            <span id="alert-message"></span>
+            <button onclick="ocultarAlerta()" class="font-bold ml-4">✕</button>
+        </div>
+    </div>
+
+    <!-- Contenedor Principal -->
+    <main class="flex-grow max-w-6xl mx-auto w-full p-4 my-4">
+
+        <!-- ========================================== -->
+        <!-- VISTA 1: AUTENTICACIÓN (LOGIN / REGISTRO)  -->
+        <!-- ========================================== -->
+        <section id="view-auth" class="max-w-md mx-auto bg-white p-8 rounded-xl shadow-md mt-6">
+            <div class="flex border-b mb-6">
+                <button id="tab-login" onclick="cambiarTabAuth('login')" class="w-1/2 pb-2 font-bold text-red-900 border-b-2 border-red-900">
+                    Iniciar Sesión
+                </button>
+                <button id="tab-register" onclick="cambiarTabAuth('register')" class="w-1/2 pb-2 font-semibold text-gray-500">
+                    Registrarse
+                </button>
+            </div>
+
+            <!-- Formulario Login -->
+            <form id="form-login" onsubmit="iniciarSesion(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Correo Institucional</label>
+                    <input type="email" id="login-correo" required placeholder="ej. ana@uaeh.edu.mx" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-800">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Contraseña</label>
+                    <input type="password" id="login-password" required placeholder="••••" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-800">
+                </div>
+                <button type="submit" class="w-full bg-red-900 text-white font-bold py-2 rounded-lg hover:bg-red-800 transition">
+                    Entrar al Sistema
+                </button>
+                <div class="text-xs text-gray-500 bg-gray-50 p-3 rounded border mt-4">
+                    <p class="font-semibold mb-1">Cuentas de prueba:</p>
+                    <p>• Estudiante: <code>ana@uaeh.edu.mx</code> / <code>1234</code></p>
+                    <p>• Bibliotecario: <code>admin@uaeh.edu.mx</code> / <code>admin</code></p>
+                </div>
+            </form>
+
+            <!-- Formulario Registro -->
+            <form id="form-register" onsubmit="registrarUsuario(event)" class="hidden space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Nombre Completo</label>
+                    <input type="text" id="reg-nombre" required placeholder="Ej. Ana García" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-800">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Correo Electrónico</label>
+                    <input type="email" id="reg-correo" required placeholder="correo@ejemplo.com" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-800">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Contraseña</label>
+                    <input type="password" id="reg-password" required minlength="4" placeholder="Mínimo 4 caracteres" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-800">
+                </div>
+                <button type="submit" class="w-full bg-red-900 text-white font-bold py-2 rounded-lg hover:bg-red-800 transition">
+                    Crear Cuenta de Estudiante
+                </button>
+            </form>
+        </section>
+
+
+        <!-- ========================================== -->
+        <!-- VISTA 2: PORTAL DEL ESTUDIANTE / USUARIO   -->
+        <!-- ========================================== -->
+        <section id="view-estudiante" class="hidden space-y-8">
+            <!-- Buscador y Catálogo -->
+            <div class="bg-white p-6 rounded-xl shadow-md">
+                <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                    <h2 class="text-xl font-bold text-gray-800">Catálogo de Libros Disponibles</h2>
+                    <input type="text" id="buscador-libros" onkeyup="renderizarCatalogoEstudiante()" placeholder="Buscar por título, autor o ISBN..." class="w-full md:w-80 border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-800">
+                </div>
+                <div id="grid-catalogo" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div>
+            </div>
+
+            <!-- Mis Préstamos Activos -->
+            <div class="bg-white p-6 rounded-xl shadow-md">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">Mis Préstamos Solicitados</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-gray-100 border-b">
+                                <th class="p-3">ID</th>
+                                <th class="p-3">Libro</th>
+                                <th class="p-3">Fecha Inicio</th>
+                                <th class="p-3">Fecha Devolución</th>
+                                <th class="p-3">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-mis-prestamos"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- VISTA 3: PANEL ADMINISTRADOR / BIBLIOTECARIO -->
+        <!-- ========================================== -->
+        <section id="view-admin" class="hidden space-y-8">
+            
+            <!-- Reportes de Uso (Métricas) -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-white p-5 rounded-xl shadow border-l-4 border-blue-600">
+                    <p class="text-sm text-gray-500">Total de Libros en Catálogo</p>
+                    <p id="stat-total-libros" class="text-3xl font-bold mt-1">0</p>
+                </div>
+                <div class="bg-white p-5 rounded-xl shadow border-l-4 border-amber-500">
+                    <p class="text-sm text-gray-500">Préstamos Activos</p>
+                    <p id="stat-prestamos-activos" class="text-3xl font-bold mt-1">0</p>
+                </div>
+                <div class="bg-white p-5 rounded-xl shadow border-l-4 border-green-600">
+                    <p class="text-sm text-gray-500">Libros Disponibles</p>
+                    <p id="stat-disponibles" class="text-3xl font-bold mt-1">0</p>
+                </div>
+            </div>
+
+            <!-- CRUD: Agregar Nuevo Libro -->
+            <div class="bg-white p-6 rounded-xl shadow-md">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">Gestionar Catálogo (Agregar Libro)</h2>
+                <form onsubmit="agregarLibro(event)" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <input type="text" id="nuevo-titulo" required placeholder="Título del libro" class="border rounded-lg px-3 py-2 text-sm">
+                    <input type="text" id="nuevo-autor" required placeholder="Autor" class="border rounded-lg px-3 py-2 text-sm">
+                    <input type="text" id="nuevo-isbn" required placeholder="ISBN (ej. 978-3-16-148410-0)" class="border rounded-lg px-3 py-2 text-sm">
+                    <button type="submit" class="bg-red-900 text-white font-semibold rounded-lg px-4 py-2 text-sm hover:bg-red-800 transition">
+                        + Registrar Libro
+                    </button>
+                </form>
+
+                <!-- Tabla CRUD de Libros -->
+                <div class="overflow-x-auto mt-6">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-gray-100 border-b">
+                                <th class="p-3">ID</th>
+                                <th class="p-3">Título</th>
+                                <th class="p-3">Autor</th>
+                                <th class="p-3">ISBN</th>
+                                <th class="p-3">Estado</th>
+                                <th class="p-3">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-admin-libros"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Gestionar Préstamos y Devoluciones -->
+            <div class="bg-white p-6 rounded-xl shadow-md">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">Gestionar Préstamos y Devoluciones</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-gray-100 border-b">
+                                <th class="p-3">ID Préstamo</th>
+                                <th class="p-3">Estudiante</th>
+                                <th class="p-3">Libro</th>
+                                <th class="p-3">Inicio</th>
+                                <th class="p-3">Devolución</th>
+                                <th class="p-3">Estado</th>
+                                <th class="p-3">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-admin-prestamos"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="bg-gray-800 text-gray-400 text-center py-4 text-xs">
+        Sistema para el Control y Gestión de Préstamos de Libros • UAEH • Grupo 3, Semestre 2
+    </footer>
+
+    <!-- ============================================================ -->
+    <!-- CAPA DE MODELO Y CONTROLADOR (Simulación API REST + SQLite)  -->
+    <!-- ============================================================ -->
+
+    <script>
+        // MODELO: Datos iniciales basados en el Diagrama de Clases y Objetos
+        // ============================================================
+    // CAPA DE MODELO Y CONTROLADOR (Supabase + Arrays simulados)
+    // ============================================================
+    
+    // 1. Inicializar Supabase (Reemplaza con tus datos reales)
+    const supabaseUrl = 'TU_URL_DE_SUPABASE';
+    const supabaseKey = 'TU_CLAVE_ANONIMA';
+    const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+    // BORRAMOS let usuarios = [...] porque Supabase ya los guarda.
+    // Mantenemos libros y préstamos simulados por ahora:
+    let libros = [
+        { idLibro: 1, titulo: "La divina comedia", autor: "Dante Alighieri", isbn: "978-8420674209", disponible: true },
+        // ... (resto de tus libros)
+    ];
+    let prestamos = [];
+    let usuarioActual = null;
+
+    // ... (Mantienes tus funciones de utilidades como mostrarAlerta y cambiarTabAuth) ...
+
+    // 2. Nuevas funciones de Autenticación con Supabase
+    async function registrarUsuario(e) {
+        e.preventDefault();
+        const correo = document.getElementById('reg-correo').value.trim();
+        const password = document.getElementById('reg-password').value;
+
+        // Supabase registra al usuario
+        const { data, error } = await supabase.auth.signUp({
+            email: correo,
+            password: password,
+        });
+
+        if (error) {
+            mostrarAlerta("Error al registrar: " + error.message, "error");
+        } else {
+            mostrarAlerta("Registro exitoso. Ahora puedes iniciar sesión.");
+            document.getElementById('form-register').reset();
+            cambiarTabAuth('login');
+        }
+    }
+
+    async function iniciarSesion(e) {
+        e.preventDefault();
+        const correo = document.getElementById('login-correo').value.trim();
+        const password = document.getElementById('login-password').value;
+
+        // Supabase valida las credenciales
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email: correo,
+            password: password,
+        });
+
+        if (error) {
+            mostrarAlerta("Error: Credenciales incorrectas.", "error");
+        } else {
+            // Supabase devuelve el usuario. Le asignamos rol "estudiante" por defecto para esta prueba
+            usuarioActual = {
+                idUsuario: data.user.id,
+                nombre: data.user.email.split('@')[0], // Usamos el correo como nombre temporal
+                correo: data.user.email,
+                rol: correo === 'admin@uaeh.edu.mx' ? 'admin' : 'estudiante' // Truco rápido para el admin
+            };
+            ocultarAlerta();
+            actualizarVistas();
+        }
+    }
+
+        let libros = [
+            { idLibro: 1, titulo: "El Principito", autor: "Antoine de Saint-Exupéry", isbn: "978-0156012195", disponible: true },
+            { idLibro: 2, titulo: "Cien Años de Soledad", autor: "Gabriel García Márquez", isbn: "978-0307474728", disponible: true },
+            { idLibro: 3, titulo: "Clean Code", autor: "Robert C. Martin", isbn: "978-0132350884", disponible: false }
+        ];
+
+        let prestamos = [
+            { idPrestamo: 101, idUsuario: 1, idLibro: 3, fechaInicio: "2026-11-10", fechaDevolucion: "2026-11-17", estado: "Activo" }
+        ];
+
+        let usuarioActual = null;
+
+        // UTILIDADES DE INTERFAZ Y MANEJO DE ERRORES
+        function mostrarAlerta(mensaje, tipo = 'success') {
+            const box = document.getElementById('alert-box');
+            const content = document.getElementById('alert-content');
+            const text = document.getElementById('alert-message');
+            
+            box.classList.remove('hidden');
+            text.textContent = mensaje;
+
+            if (tipo === 'error') {
+                content.className = "p-4 rounded-lg shadow text-sm font-medium flex justify-between items-center bg-red-100 text-red-800 border border-red-300";
+            } else {
+                content.className = "p-4 rounded-lg shadow text-sm font-medium flex justify-between items-center bg-green-100 text-green-800 border border-green-300";
+            }
+        }
+
+        function ocultarAlerta() {
+            document.getElementById('alert-box').classList.add('hidden');
+        }
+
+        function cambiarTabAuth(tab) {
+            ocultarAlerta();
+            const formLogin = document.getElementById('form-login');
+            const formReg = document.getElementById('form-register');
+            const tabLogin = document.getElementById('tab-login');
+            const tabReg = document.getElementById('tab-register');
+
+            if (tab === 'login') {
+                formLogin.classList.remove('hidden');
+                formReg.classList.add('hidden');
+                tabLogin.className = "w-1/2 pb-2 font-bold text-red-900 border-b-2 border-red-900";
+                tabReg.className = "w-1/2 pb-2 font-semibold text-gray-500";
+            } else {
+                formLogin.classList.add('hidden');
+                formReg.classList.remove('hidden');
+                tabReg.className = "w-1/2 pb-2 font-bold text-red-900 border-b-2 border-red-900";
+                tabLogin.className = "w-1/2 pb-2 font-semibold text-gray-500";
+            }
+        }
+
+        // CONTROLADOR: Autenticación (Diagrama de Actividades)
+        function registrarUsuario(e) {
+            e.preventDefault();
+            const nombre = document.getElementById('reg-nombre').value.trim();
+            const correo = document.getElementById('reg-correo').value.trim();
+            const password = document.getElementById('reg-password').value;
+
+            if (usuarios.some(u => u.correo === correo)) {
+                mostrarAlerta("Error 400: Este correo ya está registrado.", "error");
+                return;
+            }
+
+            const nuevoUsuario = {
+                idUsuario: usuarios.length + 1,
+                nombre,
+                correo,
+                password,
+                rol: "estudiante"
+            };
+            usuarios.push(nuevoUsuario);
+            e.target.reset();
+            cambiarTabAuth('login');
+            mostrarAlerta("Registro exitoso. Ahora puedes iniciar sesión.");
+        }
+
+        function iniciarSesion(e) {
+            e.preventDefault();
+            const correo = document.getElementById('login-correo').value.trim();
+            const password = document.getElementById('login-password').value;
+
+            const user = usuarios.find(u => u.correo === correo && u.password === password);
+            
+            // Validación de credenciales (Diagrama de actividades)
+            if (!user) {
+                mostrarAlerta("Error: Credenciales incorrectas. Verifica tu correo y contraseña.", "error");
+                return;
+            }
+
+            usuarioActual = user;
+            ocultarAlerta();
+            actualizarVistas();
+        }
+
+        function cerrarSesion() {
+            usuarioActual = null;
+            ocultarAlerta();
+            actualizarVistas();
+        }
+
+        function actualizarVistas() {
+            const viewAuth = document.getElementById('view-auth');
+            const viewEst = document.getElementById('view-estudiante');
+            const viewAdmin = document.getElementById('view-admin');
+            const navUser = document.getElementById('nav-user-info');
+            const userBadge = document.getElementById('user-badge');
+
+            viewAuth.classList.add('hidden');
+            viewEst.classList.add('hidden');
+            viewAdmin.classList.add('hidden');
+
+            if (!usuarioActual) {
+                viewAuth.classList.remove('hidden');
+                navUser.classList.add('hidden');
+                return;
+            }
+
+            navUser.classList.remove('hidden');
+            userBadge.textContent = `${usuarioActual.nombre} (${usuarioActual.rol === 'admin' ? 'Bibliotecario' : 'Estudiante'})`;
+
+            if (usuarioActual.rol === 'admin') {
+                viewAdmin.classList.remove('hidden');
+                renderizarAdmin();
+            } else {
+                viewEst.classList.remove('hidden');
+                renderizarCatalogoEstudiante();
+                renderizarMisPrestamos();
+            }
+        }
+
+        // CONTROLADOR: Flujo de Estudiante (Diagrama de Secuencia)
+        function renderizarCatalogoEstudiante() {
+            const filtro = document.getElementById('buscador-libros').value.toLowerCase();
+            const grid = document.getElementById('grid-catalogo');
+            grid.innerHTML = "";
+
+            const filtrados = libros.filter(l => 
+                l.titulo.toLowerCase().includes(filtro) || 
+                l.autor.toLowerCase().includes(filtro) || 
+                l.isbn.toLowerCase().includes(filtro)
+            );
+
+            filtrados.forEach(libro => {
+                const badge = libro.disponible 
+                    ? `<span class="bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded">Disponible</span>`
+                    : `<span class="bg-red-100 text-red-800 text-xs font-semibold px-2.5 py-0.5 rounded">No disponible</span>`;
+
+                const boton = libro.disponible
+                    ? `<button onclick="solicitarPrestamo(${libro.idLibro})" class="mt-4 w-full bg-red-900 text-white text-sm font-semibold py-2 rounded hover:bg-red-800 transition">Solicitar Préstamo</button>`
+                    : `<button disabled class="mt-4 w-full bg-gray-300 text-gray-500 text-sm font-semibold py-2 rounded cursor-not-allowed">No Disponible</button>`;
+
+                grid.innerHTML += `
+                    <div class="border rounded-lg p-4 flex flex-col justify-between bg-gray-50">
+                        <div>
+                            <div class="flex justify-between items-start gap-2">
+                                <h3 class="font-bold text-base text-gray-900">${libro.titulo}</h3>
+                                ${badge}
+                            </div>
+                            <p class="text-sm text-gray-600 mt-1">Autor: ${libro.autor}</p>
+                            <p class="text-xs text-gray-400 mt-1">ISBN: ${libro.isbn}</p>
+                        </div>
+                        ${boton}
+                    </div>
+                `;
+            });
+        }
+
+        function solicitarPrestamo(idLibro) {
+            const libro = libros.find(l => l.idLibro === idLibro);
+
+            // Validación de disponibilidad (HTTP 409 Conflict si no está disponible)
+            if (!libro || !libro.disponible) {
+                mostrarAlerta("HTTP 409 - Préstamo rechazado: El libro ya no está disponible.", "error");
+                return;
+            }
+
+            // Transacción: Actualizar estado del libro y crear préstamo
+            libro.disponible = false;
+            const hoy = new Date();
+            const devolucion = new Date();
+            devolucion.setDate(hoy.getDate() + 7);
+
+            const nuevoPrestamo = {
+                idPrestamo: Math.floor(100 + Math.random() * 900),
+                idUsuario: usuarioActual.idUsuario,
+                idLibro: libro.idLibro,
+                fechaInicio: hoy.toISOString().split('T')[0],
+                fechaDevolucion: devolucion.toISOString().split('T')[0],
+                estado: "Activo"
+            };
+
+            prestamos.push(nuevoPrestamo);
+            mostrarAlerta(`HTTP 200 OK - Préstamo confirmado para "${libro.titulo}". Devolución: ${nuevoPrestamo.fechaDevolucion}`);
+            renderizarCatalogoEstudiante();
+            renderizarMisPrestamos();
+        }
+
+        function renderizarMisPrestamos() {
+            const tbody = document.getElementById('tabla-mis-prestamos');
+            tbody.innerHTML = "";
+            const misPrestamos = prestamos.filter(p => p.idUsuario === usuarioActual.idUsuario);
+
+            if (misPrestamos.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-3 text-center text-gray-500">Aún no tienes préstamos registrados.</td></tr>`;
+                return;
+            }
+
+            misPrestamos.forEach(p => {
+                const libro = libros.find(l => l.idLibro === p.idLibro);
+                const estadoColor = p.estado === 'Activo' ? 'text-amber-600 font-bold' : 'text-green-600 font-semibold';
+                tbody.innerHTML += `
+                    <tr class="border-b">
+                        <td class="p-3">#${p.idPrestamo}</td>
+                        <td class="p-3 font-medium">${libro ? libro.titulo : 'Desconocido'}</td>
+                        <td class="p-3">${p.fechaInicio}</td>
+                        <td class="p-3">${p.fechaDevolucion}</td>
+                        <td class="p-3 ${estadoColor}">${p.estado}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        // CONTROLADOR: Panel Administrador / Bibliotecario
+        function agregarLibro(e) {
+            e.preventDefault();
+            const titulo = document.getElementById('nuevo-titulo').value.trim();
+            const autor = document.getElementById('nuevo-autor').value.trim();
+            const isbn = document.getElementById('nuevo-isbn').value.trim();
+
+            libros.push({
+                idLibro: libros.length + 1,
+                titulo,
+                autor,
+                isbn,
+                disponible: true
+            });
+
+            e.target.reset();
+            mostrarAlerta(`Libro "${titulo}" agregado al catálogo correctamente.`);
+            renderizarAdmin();
+        }
+
+        function eliminarLibro(idLibro) {
+            const tienePrestamoActivo = prestamos.some(p => p.idLibro === idLibro && p.estado === 'Activo');
+            if (tienePrestamoActivo) {
+                mostrarAlerta("Error: No puedes eliminar un libro que tiene un préstamo activo.", "error");
+                return;
+            }
+            libros = libros.filter(l => l.idLibro !== idLibro);
+            mostrarAlerta("Libro eliminado del catálogo.");
+            renderizarAdmin();
+        }
+
+        function registrarDevolucion(idPrestamo) {
+            const prestamo = prestamos.find(p => p.idPrestamo === idPrestamo);
+            if (!prestamo) return;
+
+            prestamo.estado = "Devuelto";
+            const libro = libros.find(l => l.idLibro === prestamo.idLibro);
+            if (libro) libro.disponible = true;
+
+            mostrarAlerta(`Devolución registrada para el préstamo #${idPrestamo}. El libro vuelve a estar disponible.`);
+            renderizarAdmin();
+        }
+
+        function renderizarAdmin() {
+            // Actualizar Reportes de Uso
+            document.getElementById('stat-total-libros').textContent = libros.length;
+            document.getElementById('stat-prestamos-activos').textContent = prestamos.filter(p => p.estado === 'Activo').length;
+            document.getElementById('stat-disponibles').textContent = libros.filter(l => l.disponible).length;
+
+            // Tabla Libros
+            const tbodyLibros = document.getElementById('tabla-admin-libros');
+            tbodyLibros.innerHTML = "";
+            libros.forEach(l => {
+                tbodyLibros.innerHTML += `
+                    <tr class="border-b">
+                        <td class="p-3">${l.idLibro}</td>
+                        <td class="p-3 font-medium">${l.titulo}</td>
+                        <td class="p-3">${l.autor}</td>
+                        <td class="p-3 text-xs">${l.isbn}</td>
+                        <td class="p-3">${l.disponible ? '<span class="text-green-600 font-semibold">Disponible</span>' : '<span class="text-red-600 font-semibold">Prestado</span>'}</td>
+                        <td class="p-3">
+                            <button onclick="eliminarLibro(${l.idLibro})" class="text-red-600 hover:underline text-xs font-semibold">Eliminar</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            // Tabla Préstamos
+            const tbodyPrestamos = document.getElementById('tabla-admin-prestamos');
+            tbodyPrestamos.innerHTML = "";
+            prestamos.forEach(p => {
+                const user = usuarios.find(u => u.idUsuario === p.idUsuario);
+                const libro = libros.find(l => l.idLibro === p.idLibro);
+                const accionBtn = p.estado === 'Activo'
+                    ? `<button onclick="registrarDevolucion(${p.idPrestamo})" class="bg-green-600 text-white text-xs px-3 py-1 rounded hover:bg-green-700">Registrar Devolución</button>`
+                    : `<span class="text-gray-400 text-xs">Completado</span>`;
+
+                tbodyPrestamos.innerHTML += `
+                    <tr class="border-b">
+                        <td class="p-3">#${p.idPrestamo}</td>
+                        <td class="p-3">${user ? user.nombre : 'N/A'}</td>
+                        <td class="p-3 font-medium">${libro ? libro.titulo : 'N/A'}</td>
+                        <td class="p-3">${p.fechaInicio}</td>
+                        <td class="p-3">${p.fechaDevolucion}</td>
+                        <td class="p-3 font-semibold ${p.estado === 'Activo' ? 'text-amber-600' : 'text-green-600'}">${p.estado}</td>
+                        <td class="p-3">${accionBtn}</td>
+                    </tr>
+                `;
+            });
+        }
+    </script>
+</body>
+</html>
